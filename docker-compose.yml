@@ -9,8 +9,8 @@ services:
       POSTGRES_PASSWORD: "admin"
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - /home/hack/postgresql/sqlscript:/docker-entrypoint-initdb.d
-      - /home/hack/postgresql/data:/var/lib/postgresql/data
+      - ./postgresql/sqlscript:/docker-entrypoint-initdb.d
+      - ./postgresql/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d hack"]
       interval: 10s

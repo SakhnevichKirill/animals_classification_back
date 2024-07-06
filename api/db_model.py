@@ -73,9 +73,9 @@ class TransactionHistory(Base):
     )
     err_reason = Column(String(512), nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    document_id = Column(UUID, ForeignKey("documents.id"))
+    uploaded_file_id = Column(UUID, ForeignKey("uploaded_files.id"))
 
-    document = relationship("Document", back_populates="transaction_history")
+    uploaded_file = relationship("UploadedFile", back_populates="transaction_history")
 
 
 class MLModel(Base):
@@ -97,8 +97,8 @@ class UserUpdate(schemas.BaseUserUpdate):
     pass
 
 
-class Document(Base):
-    __tablename__ = 'documents'
+class UploadedFile(Base):
+    __tablename__ = 'uploaded_files'
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(256), nullable=False)
     is_deleted = Column(Boolean, default=False)
@@ -106,16 +106,16 @@ class Document(Base):
     any_error_reason = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    transaction_history = relationship("TransactionHistory", back_populates="document")
-    # users_to_documents = relationship("UsersToDocuments", back_populates="document")
+    transaction_history = relationship("TransactionHistory", back_populates="uploaded_file")
+    # users_to_uploaded_files = relationship("UsersToDocuments", back_populates="uploaded_file")
 
 class UsersToDocuments(Base):
-    __tablename__ = 'users_to_documents'
+    __tablename__ = 'users_to_uploaded_files'
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(UUID, ForeignKey("users.id"))
-    document_id = Column(UUID, ForeignKey("documents.id"))
+    uploaded_file_id = Column(UUID, ForeignKey("uploaded_files.id"))
 
-    # document = relationship("Document", back_populates="users_to_documents")
+    # uploaded_file = relationship("UploadedFile", back_populates="users_to_uploaded_files")
 
 class Tag(Base):
     __tablename__ = 'tags'
@@ -123,10 +123,10 @@ class Tag(Base):
     name = Column(String, nullable=False)
 
 class DocumentsToTags(Base):
-    __tablename__ = 'documents_to_tags'
+    __tablename__ = 'uploaded_files_to_tags'
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     tag_id = Column('tag_id', Integer, ForeignKey('tags.id'))
-    document_id = Column('document_id', UUID(as_uuid=True), ForeignKey('documents.id'))
+    uploaded_file_id = Column('uploaded_file_id', UUID(as_uuid=True), ForeignKey('uploaded_files.id'))
 
 
 async def create_db_and_tables():
@@ -195,7 +195,7 @@ async def get_user_db(session: AsyncSession = Depends(get_session)):
 # | model_name  | String(64)   | None    | Unique          |
 # | model_cost  | Float        | None    |                 |
 # 
-# ### Document Table
+# ### UploadedFile Table
 # | Column             | Type                     | Default   | Constraint                  |
 # |--------------------|--------------------------|-----------|-----------------------------|
 # | id                 | UUID                     | uuid.uuid4 | Primary Key                 |
@@ -210,7 +210,7 @@ async def get_user_db(session: AsyncSession = Depends(get_session)):
 # |--------------|-------|---------|-----------------------|
 # | id           | Integer | None  | Primary Key, Indexed, Autoincrement |
 # | user_id      | UUID    | None  | Foreign Key (users.id) |
-# | document_id  | UUID    | None  | Foreign Key (documents.id) |
+# | uploaded_file_id  | UUID    | None  | Foreign Key (uploaded_files.id) |
 # 
 # ### Tag Table
 # | Column | Type   | Default | Constraint       |
@@ -223,5 +223,5 @@ async def get_user_db(session: AsyncSession = Depends(get_session)):
 # |--------------|---------|---------|---------------------------------|
 # | id           | Integer | None    | Primary Key, Indexed, Autoincrement |
 # | tag_id       | Integer | None    | Foreign Key (tags.id)           |
-# | document_id  | UUID    | None    | Foreign Key (documents.id)      |
+# | uploaded_file_id  | UUID    | None    | Foreign Key (uploaded_files.id)      |
 # 

@@ -3,7 +3,7 @@ from typing import Dict, Any
 
 from sqlalchemy import select
 # from worker.models.text_classification_hackaton import Model
-from api.db_model import TransactionHistory, get_session, TransactionStatusEnum, Document
+from api.db_model import TransactionHistory, get_session, TransactionStatusEnum, UploadedFile
 from sqlalchemy.exc import NoResultFound
 # from worker.models.text_classification_hackaton.utils import FileProcessor
 from api.s3 import s3
@@ -13,11 +13,11 @@ import traceback
 # file_proc = FileProcessor()
 
 
-async def analyze_document(
+async def analyze_uploaded_file(
     ctx: Dict[str, Any],
     class_name: str,
-    doc_id : str,
-    doc_name: str,
+    uploaded_file_id : str,
+    uploaded_file_name: str,
     **kwargs: Any,
 ):
     async for session in get_session():
@@ -33,11 +33,11 @@ async def analyze_document(
             transaction = transaction.scalar()
             
             doc = await session.execute(
-                select(Document).filter_by(id=doc_id)
+                select(UploadedFile).filter_by(id=uploaded_file_id)
             )
             doc = doc.scalar()
             
-            # data = await file_proc.process_file(doc_name, doc_id)
+            # data = await file_proc.process_file(uploaded_file_name, uploaded_file_id)
             
             # result = model.predict(data)
             result = "Test results"
@@ -52,7 +52,7 @@ async def analyze_document(
 
             transaction.status = TransactionStatusEnum.SUCCESS
 
-            json_data = json.dumps({"data": doc_id, "result": f"Model got {result} class ({class_name} expected)"})
+            json_data = json.dumps({"data": uploaded_file_id, "result": f"Model got {result} class ({class_name} expected)"})
             transaction.result = json_data
             await session.commit()
             return result
@@ -63,4 +63,4 @@ async def analyze_document(
             doc.cancellation_reason = f"File processing error: {e}"
             await session.commit()
             traceback.print_exc()
-            return json.dumps({"data": doc_id, "result": str(e)})
+            return json.dumps({"data": uploaded_file_id, "result": str(e)})

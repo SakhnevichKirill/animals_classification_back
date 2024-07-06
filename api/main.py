@@ -5,14 +5,14 @@ import logging
 from fastapi_limiter import FastAPILimiter
 from api.Asyncrq import asyncrq
 from api.db_model import create_db_and_tables, add_default_values
-from api.endpoints import auth, predict, users, documents
+from api.endpoints import auth, predict, users, uploaded_files
 from .s3 import s3, BUCKET_NAME
 from .env_config import config
 
 
 app = FastAPI(title="docs-class")
 app.include_router(auth.api_router, prefix="/v1/auth", tags=["auth"])
-app.include_router(documents.router, prefix="/v1/documents", tags=["docs"])
+app.include_router(uploaded_files.router, prefix="/v1/uploaded_files", tags=["docs"])
 app.include_router(predict.router, prefix="/v1/predict", tags=["pred"])
 app.include_router(users.router, prefix="/v1/users", tags=["users"])
 
@@ -42,7 +42,7 @@ async def startup_event():
         await s3.create_bucket(BUCKET_NAME)
     except Exception as e:
         print(e)
-        # return json.dumps({"data": doc_id, "result": str(e)})
+        # return json.dumps({"data": uploaded_file_id, "result": str(e)})
 
 
 

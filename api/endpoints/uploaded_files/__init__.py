@@ -2,7 +2,7 @@ import uuid
 import arq.jobs
 from fastapi import Depends, APIRouter, HTTPException, Response, status,  UploadFile, File
 from sqlalchemy import select
-from api.db_model import User, TransactionHistory, get_session, MLModel, Document, UsersToDocuments
+from api.db_model import User, TransactionHistory, get_session, MLModel, UploadedFile, UsersToDocuments
 from api.endpoints.auth.FastAPI_users import current_active_user
 from api.endpoints.auth.manuspect_users import auth_manuspect_user
 from api.endpoints.predict.utils import validate_model_name
@@ -26,7 +26,7 @@ router = APIRouter(
 #     status_code=status.HTTP_200_OK,
 # )
 # async def get_doc(
-#     document: str,
+#     uploaded_file: str,
 #     target_class: str,
 #     user: User = Depends(current_active_user),
 #     session: AsyncSession = Depends(get_session),
@@ -49,55 +49,55 @@ async def download_docs(
     user: User = await auth_manuspect_user(auth_token, session)
     # Проверка доступа к файлу
     result = await session.execute(
-        select(Document)
-        .join(UsersToDocuments, UsersToDocuments.document_id == Document.id)
-        .filter(UsersToDocuments.user_id == user.id, Document.id == filename, Document.is_deleted == False)
+        select(UploadedFile)
+        .join(UsersToDocuments, UsersToDocuments.uploaded_file_id == UploadedFile.id)
+        .filter(UsersToDocuments.user_id == user.id, UploadedFile.id == filename, UploadedFile.is_deleted == False)
     )
-    document = result.scalars().first()
-    if not document:
+    uploaded_file = result.scalars().first()
+    if not uploaded_file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     data = await s3.download_file(filename)
     data = ""
     headers = {
-        'Content-Disposition': f'attachment; filename="{document.name}"'
+        'Content-Disposition': f'attachment; filename="{uploaded_file.name}"'
     }
     return Response(content=data, media_type="application/octet-stream", headers=headers)
 
 @router.delete(
-    "/{document_id}",
+    "/{uploaded_file_id}",
     status_code=status.HTTP_200_OK
 )
-async def delete_document(
+async def delete_uploaded_file(
     auth_token: str,
-    document_id: str,
+    uploaded_file_id: str,
     session: AsyncSession = Depends(get_session)
 ):
     user: User = await auth_manuspect_user(auth_token, session)
-    # Fetch the document to ensure it exists and is associated with the user
+    # Fetch the uploaded_file to ensure it exists and is associated with the user
     result = await session.execute(
-        select(Document)
-        .join(UsersToDocuments, UsersToDocuments.document_id == Document.id)
+        select(UploadedFile)
+        .join(UsersToDocuments, UsersToDocuments.uploaded_file_id == UploadedFile.id)
         .filter(
             UsersToDocuments.user_id == user.id,
-            Document.id == document_id,
-            Document.is_deleted == False
+            UploadedFile.id == uploaded_file_id,
+            UploadedFile.is_deleted == False
         )
     )
-    document = result.scalars().first()
+    uploaded_file = result.scalars().first()
     
-    # If the document is not found or already deleted, return a 404 error
-    if not document:
+    # If the uploaded_file is not found or already deleted, return a 404 error
+    if not uploaded_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            detail="UploadedFile not found"
         )
     
-    # Mark the document as deleted
-    document.is_deleted = True
-    session.add(document)
+    # Mark the uploaded_file as deleted
+    uploaded_file.is_deleted = True
+    session.add(uploaded_file)
     await session.commit()
     
-    return {"detail": "Document deleted successfully"}
+    return {"detail": "UploadedFile deleted successfully"}
 
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm import contains_eager
@@ -114,116 +114,116 @@ async def get_docs_info_by_user(
 ):
     user: User = await auth_manuspect_user(auth_token, session)
     # Запрос для получения документов, связанных с пользователем
-    documents_stmt = select(Document).\
-        join(UsersToDocuments, Document.id == UsersToDocuments.document_id).\
+    uploaded_files_stmt = select(UploadedFile).\
+        join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id).\
         filter(UsersToDocuments.user_id == user.id)
 
     # Выполнение запроса для получения документов
-    document_results = await session.execute(documents_stmt)
-    documents = document_results.scalars().all()
+    uploaded_file_results = await session.execute(uploaded_files_stmt)
+    uploaded_files = uploaded_file_results.scalars().all()
 
-    if not documents:
+    if not uploaded_files:
         return []
 
     # Собираем идентификаторы документов
-    document_ids = [document.id for document in documents]
+    uploaded_file_ids = [uploaded_file.id for uploaded_file in uploaded_files]
 
     # Запрос для получения job_id для этих документов
-    transactions_stmt = select(TransactionHistory.document_id, TransactionHistory.job_id).\
-        filter(TransactionHistory.document_id.in_(document_ids))
+    transactions_stmt = select(TransactionHistory.uploaded_file_id, TransactionHistory.job_id).\
+        filter(TransactionHistory.uploaded_file_id.in_(uploaded_file_ids))
 
     # Выполнение запроса для получения транзакций
     transaction_results = await session.execute(transactions_stmt)
     transactions = transaction_results.all()
 
-    # Создаем словарь для эффективного поиска job_id по document_id
-    transaction_map = {doc_id: job_id for doc_id, job_id in transactions}
+    # Создаем словарь для эффективного поиска job_id по uploaded_file_id
+    transaction_map = {uploaded_file_id: job_id for uploaded_file_id, job_id in transactions}
 
     # Собираем результат для возврата
-    documents_with_jobs = [
+    uploaded_files_with_jobs = [
         {
-            **document.__dict__,
-            "job_id": transaction_map.get(document.id)
+            **uploaded_file.__dict__,
+            "job_id": transaction_map.get(uploaded_file.id)
         }
-        for document in documents
+        for uploaded_file in uploaded_files
     ]
 
     # Убираем служебное поле _sa_instance_state
-    for document in documents_with_jobs:
-        document.pop('_sa_instance_state', None)
+    for uploaded_file in uploaded_files_with_jobs:
+        uploaded_file.pop('_sa_instance_state', None)
 
-    return documents_with_jobs
+    return uploaded_files_with_jobs
 
 @router.get(
-    "/status/{doc_id}",
+    "/status/{uploaded_file_id}",
     status_code=status.HTTP_200_OK,
 )
 async def get_docs_info_by_user(
-    doc_id: str | None,
+    uploaded_file_id: str | None,
     auth_token: str,
     session: AsyncSession = Depends(get_session),
 ):
     user: User = await auth_manuspect_user(auth_token, session)
 
     # Создаем запрос с объединением таблиц документов и транзакций
-    stmt = select(Document)\
-        .join(UsersToDocuments, Document.id == UsersToDocuments.document_id)\
-        .join(TransactionHistory, Document.id == TransactionHistory.document_id, isouter=True)\
+    stmt = select(UploadedFile)\
+        .join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id)\
+        .join(TransactionHistory, UploadedFile.id == TransactionHistory.uploaded_file_id, isouter=True)\
         .filter(
             UsersToDocuments.user_id == user.id,
-            Document.id == doc_id,  # Добавляем условие по doc_id
-            Document.is_deleted == False,
+            UploadedFile.id == uploaded_file_id,  # Добавляем условие по uploaded_file_id
+            UploadedFile.is_deleted == False,
         )\
-        .options(joinedload(Document.transaction_history))\
+        .options(joinedload(UploadedFile.transaction_history))\
         .limit(1)  # Ограничиваем количество результатов до одного
 
     # Выполняем запрос
     result = await session.execute(stmt)
 
     # Получаем один документ пользователя, если такой существует
-    document = result.scalars().first()
-    return document
+    uploaded_file = result.scalars().first()
+    return uploaded_file
 
 
 @router.get(
-    "/verify/{doc_id}",
+    "/verify/{uploaded_file_id}",
     status_code=status.HTTP_200_OK,
 )
-async def verify_document(
+async def verify_uploaded_file(
     any_error_verified: bool,
     any_error_reason: str,
-    doc_id: str | None,
+    uploaded_file_id: str | None,
     auth_token: str,
     session: AsyncSession = Depends(get_session),
 ):
     user: User = await auth_manuspect_user(auth_token, session)
 
     # Создаем запрос с объединением таблиц документов и транзакций
-    stmt = select(Document)\
-        .join(UsersToDocuments, Document.id == UsersToDocuments.document_id)\
-        .join(TransactionHistory, Document.id == TransactionHistory.document_id, isouter=True)\
+    stmt = select(UploadedFile)\
+        .join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id)\
+        .join(TransactionHistory, UploadedFile.id == TransactionHistory.uploaded_file_id, isouter=True)\
         .filter(
             UsersToDocuments.user_id == user.id,
-            Document.id == doc_id,  # Добавляем условие по doc_id
-            Document.is_deleted == False,
+            UploadedFile.id == uploaded_file_id,  # Добавляем условие по uploaded_file_id
+            UploadedFile.is_deleted == False,
         )\
-        .options(joinedload(Document.transaction_history))\
+        .options(joinedload(UploadedFile.transaction_history))\
         .limit(1)  # Ограничиваем количество результатов до одного
 
     # Выполняем запрос
     result = await session.execute(stmt)
 
     # Получаем один документ пользователя, если такой существует
-    document = result.scalars().first()
+    uploaded_file = result.scalars().first()
 
-    if document:
-        document.any_error_verified = any_error_verified
-        document.any_error_reason = any_error_reason
-        return document
+    if uploaded_file:
+        uploaded_file.any_error_verified = any_error_verified
+        uploaded_file.any_error_reason = any_error_reason
+        return uploaded_file
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            detail="UploadedFile not found"
         )
 
 
@@ -231,30 +231,30 @@ async def verify_document(
 @router.post(
     "/", 
     status_code=status.HTTP_201_CREATED,
-    response_description="The document has been successfully created. Please track the execution by job_id",
+    response_description="The uploaded_file has been successfully created. Please track the execution by job_id",
 )
-async def upload_document(
+async def upload_uploaded_file(
     auth_token: str,
-    document: UploadFile = File(description="Your document (max 10 MB)"),
+    uploaded_file: UploadFile = File(description="Your uploaded_file (max 10 MB)"),
     session: AsyncSession = Depends(get_session),
 ):
     user: User = await auth_manuspect_user(auth_token, session)
 
-    doc_id = uuid.uuid4()
-    await s3.upload_file(file=document.file, filename=str(doc_id))
+    uploaded_file_id = uuid.uuid4()
+    await s3.upload_file(file=uploaded_file.file, filename=str(uploaded_file_id))
 
-    new_document = Document(id=doc_id, name=document.filename)
-    session.add(new_document)
+    new_uploaded_file = UploadedFile(id=uploaded_file_id, name=uploaded_file.filename)
+    session.add(new_uploaded_file)
     
-    new_users_to_document = UsersToDocuments(user_id=user.id, document_id=new_document.id)
-    session.add(new_users_to_document)    
+    new_users_to_uploaded_file = UsersToDocuments(user_id=user.id, uploaded_file_id=new_uploaded_file.id)
+    session.add(new_users_to_uploaded_file)    
     await session.commit()
 
     transaction = TransactionHistory(
         job_id=uuid.uuid4(),
         user_id=user.id,
         amount=0,
-        document_id=new_document.id,
+        uploaded_file_id=new_uploaded_file.id,
         model_id=None,
     )
     session.add(transaction)
@@ -262,10 +262,10 @@ async def upload_document(
 
     
     job = await asyncrq.pool.enqueue_job(
-        function="analyze_document",
+        function="analyze_uploaded_file",
         _job_id=str(transaction.job_id),
-        doc_id=str(doc_id),
-        doc_name=document.filename
+        uploaded_file_id=str(uploaded_file_id),
+        uploaded_file_name=uploaded_file.filename
     )
     
     info = await job.info()
@@ -273,6 +273,6 @@ async def upload_document(
     return {
         "job_id": str(job.job_id),
         "job_try": str(info.job_try),
-        "doc_id": str(doc_id),
+        "uploaded_file_id": str(uploaded_file_id),
         "enqueue_time": str(info.enqueue_time),
     }

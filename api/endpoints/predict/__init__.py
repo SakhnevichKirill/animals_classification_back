@@ -109,7 +109,7 @@ async def get_transaction_result(
 #     session.add(transaction)
 #     await session.commit()
 #     job: arq.jobs.Job = await asyncrq.pool.enqueue_job(
-#         function="analyze_document",
+#         function="analyze_uploaded_file",
 #         _job_id=str(transaction.job_id),
 #         model_name=model_name,
 #         data=data.model_dump(),

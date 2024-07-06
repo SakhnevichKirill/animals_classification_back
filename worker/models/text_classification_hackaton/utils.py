@@ -1,6 +1,6 @@
 from api.s3 import s3
 from PyPDF2 import PdfReader
-from docx import Document
+from docx import UploadedFile
 import openpyxl
 
 class FileProcessor:
@@ -40,7 +40,7 @@ class FileProcessor:
     def extract_text_from_docx(self, file_data):
         with open('temp_file.docx', 'wb') as f:
             f.write(file_data)
-        doc = Document('temp_file.docx')
+        doc = UploadedFile('temp_file.docx')
         text = "\n".join([para.text for para in doc.paragraphs])
         return text
 
