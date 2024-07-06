@@ -1,0 +1,14 @@
+arq
+asyncpg
+sqlalchemy
+pandas
+pydantic
+fastapi
+fastapi-users[sqlalchemy]
+PyPDF2
+python-docx
+openpyxl 
+transformers
+aioboto3
+pydub
+unstructured
