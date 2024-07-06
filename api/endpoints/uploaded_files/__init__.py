@@ -2,7 +2,7 @@ import uuid
 import arq.jobs
 from fastapi import Depends, APIRouter, HTTPException, Response, status,  UploadFile, File
 from sqlalchemy import select
-from api.db_model import User, TransactionHistory, get_session, MLModel, UploadedFile, UsersToDocuments
+from api.db_model import User, TransactionHistory, get_session, MLModel, UploadedFile, UsersToUploadedFiles
 from api.endpoints.auth.FastAPI_users import current_active_user
 from api.endpoints.auth.manuspect_users import auth_manuspect_user
 from api.endpoints.predict.utils import validate_model_name
@@ -50,8 +50,8 @@ async def download_docs(
     # Проверка доступа к файлу
     result = await session.execute(
         select(UploadedFile)
-        .join(UsersToDocuments, UsersToDocuments.uploaded_file_id == UploadedFile.id)
-        .filter(UsersToDocuments.user_id == user.id, UploadedFile.id == filename, UploadedFile.is_deleted == False)
+        .join(UsersToUploadedFiles, UsersToUploadedFiles.uploaded_file_id == UploadedFile.id)
+        .filter(UsersToUploadedFiles.user_id == user.id, UploadedFile.id == filename, UploadedFile.is_deleted == False)
     )
     uploaded_file = result.scalars().first()
     if not uploaded_file:
@@ -76,9 +76,9 @@ async def delete_uploaded_file(
     # Fetch the uploaded_file to ensure it exists and is associated with the user
     result = await session.execute(
         select(UploadedFile)
-        .join(UsersToDocuments, UsersToDocuments.uploaded_file_id == UploadedFile.id)
+        .join(UsersToUploadedFiles, UsersToUploadedFiles.uploaded_file_id == UploadedFile.id)
         .filter(
-            UsersToDocuments.user_id == user.id,
+            UsersToUploadedFiles.user_id == user.id,
             UploadedFile.id == uploaded_file_id,
             UploadedFile.is_deleted == False
         )
@@ -108,15 +108,15 @@ th_alias = aliased(TransactionHistory)
     "/",
     status_code=status.HTTP_200_OK,
 )
-async def get_docs_info_by_user(
+async def get_uploaded_file_by_user(
     auth_token: str,
     session: AsyncSession = Depends(get_session),
 ):
     user: User = await auth_manuspect_user(auth_token, session)
     # Запрос для получения документов, связанных с пользователем
-    uploaded_files_stmt = select(UploadedFile).\
-        join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id).\
-        filter(UsersToDocuments.user_id == user.id)
+    uploaded_files_stmt = select(UploadedFile)\
+        .join(UsersToUploadedFiles, UploadedFile.id == UsersToUploadedFiles.uploaded_file_id)\
+        .filter(UsersToUploadedFiles.user_id == user.id)
 
     # Выполнение запроса для получения документов
     uploaded_file_results = await session.execute(uploaded_files_stmt)
@@ -158,19 +158,18 @@ async def get_docs_info_by_user(
     "/status/{uploaded_file_id}",
     status_code=status.HTTP_200_OK,
 )
-async def get_docs_info_by_user(
+async def get_status_uploaded_file_by_id(
     uploaded_file_id: str | None,
     auth_token: str,
     session: AsyncSession = Depends(get_session),
 ):
     user: User = await auth_manuspect_user(auth_token, session)
-
     # Создаем запрос с объединением таблиц документов и транзакций
     stmt = select(UploadedFile)\
-        .join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id)\
+        .join(UsersToUploadedFiles, UploadedFile.id == UsersToUploadedFiles.uploaded_file_id)\
         .join(TransactionHistory, UploadedFile.id == TransactionHistory.uploaded_file_id, isouter=True)\
         .filter(
-            UsersToDocuments.user_id == user.id,
+            UsersToUploadedFiles.user_id == user.id,
             UploadedFile.id == uploaded_file_id,  # Добавляем условие по uploaded_file_id
             UploadedFile.is_deleted == False,
         )\
@@ -183,49 +182,6 @@ async def get_docs_info_by_user(
     # Получаем один документ пользователя, если такой существует
     uploaded_file = result.scalars().first()
     return uploaded_file
-
-
-@router.get(
-    "/verify/{uploaded_file_id}",
-    status_code=status.HTTP_200_OK,
-)
-async def verify_uploaded_file(
-    any_error_verified: bool,
-    any_error_reason: str,
-    uploaded_file_id: str | None,
-    auth_token: str,
-    session: AsyncSession = Depends(get_session),
-):
-    user: User = await auth_manuspect_user(auth_token, session)
-
-    # Создаем запрос с объединением таблиц документов и транзакций
-    stmt = select(UploadedFile)\
-        .join(UsersToDocuments, UploadedFile.id == UsersToDocuments.uploaded_file_id)\
-        .join(TransactionHistory, UploadedFile.id == TransactionHistory.uploaded_file_id, isouter=True)\
-        .filter(
-            UsersToDocuments.user_id == user.id,
-            UploadedFile.id == uploaded_file_id,  # Добавляем условие по uploaded_file_id
-            UploadedFile.is_deleted == False,
-        )\
-        .options(joinedload(UploadedFile.transaction_history))\
-        .limit(1)  # Ограничиваем количество результатов до одного
-
-    # Выполняем запрос
-    result = await session.execute(stmt)
-
-    # Получаем один документ пользователя, если такой существует
-    uploaded_file = result.scalars().first()
-
-    if uploaded_file:
-        uploaded_file.any_error_verified = any_error_verified
-        uploaded_file.any_error_reason = any_error_reason
-        return uploaded_file
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="UploadedFile not found"
-        )
-
 
 
 @router.post(
@@ -246,7 +202,7 @@ async def upload_uploaded_file(
     new_uploaded_file = UploadedFile(id=uploaded_file_id, name=uploaded_file.filename)
     session.add(new_uploaded_file)
     
-    new_users_to_uploaded_file = UsersToDocuments(user_id=user.id, uploaded_file_id=new_uploaded_file.id)
+    new_users_to_uploaded_file = UsersToUploadedFiles(user_id=user.id, uploaded_file_id=new_uploaded_file.id)
     session.add(new_users_to_uploaded_file)    
     await session.commit()
 

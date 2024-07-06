@@ -15,7 +15,6 @@ import traceback
 
 async def analyze_uploaded_file(
     ctx: Dict[str, Any],
-    class_name: str,
     uploaded_file_id : str,
     uploaded_file_name: str,
     **kwargs: Any,

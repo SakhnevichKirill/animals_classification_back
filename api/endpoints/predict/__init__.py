@@ -33,19 +33,19 @@ router = APIRouter(
 #     return [model.__dict__ for model in models]
 
 
-@router.get(
-    "/{job_id}",
-    status_code=status.HTTP_200_OK,
-)
-async def get_job_result(
-    auth_token: str,
-    job_id: str,
-    session: AsyncSession = Depends(get_session),
-):
-    user: User = await auth_manuspect_user(auth_token, session)
-    job = Job(job_id=job_id, redis=asyncrq.pool)
-    res = await job.result(timeout=30)
-    return res 
+# @router.get(
+#     "/{job_id}",
+#     status_code=status.HTTP_200_OK,
+# )
+# async def get_job_result(
+#     auth_token: str,
+#     job_id: str,
+#     session: AsyncSession = Depends(get_session),
+# ):
+#     user: User = await auth_manuspect_user(auth_token, session)
+#     job = Job(job_id=job_id, redis=asyncrq.pool)
+#     res = await job.result(timeout=30)
+#     return res 
 
 @router.post(
     "/transaction/{job_id}",
@@ -81,7 +81,7 @@ async def get_transaction_result(
         select(TransactionHistory).filter_by(job_id=job_id).limit(1)
     )
     transaction = transaction.scalars().first()
-    await transaction
+    return transaction
 
 
 # @router.post(

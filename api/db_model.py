@@ -28,6 +28,7 @@ from fastapi_users import schemas
 import enum
 from .env_config import config
 
+# Base definition
 Base = declarative_base()
 
 # Асинхронный URL для PostgreSQL
@@ -42,11 +43,15 @@ engine = create_async_engine(
 )
 AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
+# Enum definitions
+
 
 class TransactionStatusEnum(enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
+
+# User Model
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
@@ -56,8 +61,10 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     __table_args__ = (
         CheckConstraint(
             "balance >= 0", name="check_positive_balance"
-        ),  # Проверка, что balance больше 0
+        ),  # Check that balance is positive
     )
+
+# Transaction History Model
 
 
 class TransactionHistory(Base):
@@ -78,11 +85,14 @@ class TransactionHistory(Base):
     uploaded_file = relationship("UploadedFile", back_populates="transaction_history")
 
 
+# ML Model
 class MLModel(Base):
     __tablename__ = "ml_models"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     model_name = Column(String(64), unique=True)
     model_cost = Column(Float)
+
+# User schemas
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
@@ -107,22 +117,21 @@ class UploadedFile(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     transaction_history = relationship("TransactionHistory", back_populates="uploaded_file")
-    # users_to_uploaded_files = relationship("UsersToDocuments", back_populates="uploaded_file")
+    # users_to_uploaded_files = relationship("UsersToUploadedFiles", back_populates="uploaded_file")
 
-class UsersToDocuments(Base):
+class UsersToUploadedFiles(Base):
     __tablename__ = 'users_to_uploaded_files'
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(UUID, ForeignKey("users.id"))
     uploaded_file_id = Column(UUID, ForeignKey("uploaded_files.id"))
 
-    # uploaded_file = relationship("UploadedFile", back_populates="users_to_uploaded_files")
 
 class Tag(Base):
     __tablename__ = 'tags'
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String, nullable=False)
 
-class DocumentsToTags(Base):
+class UploadedFilesToTags(Base):
     __tablename__ = 'uploaded_files_to_tags'
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     tag_id = Column('tag_id', Integer, ForeignKey('tags.id'))
@@ -131,7 +140,6 @@ class DocumentsToTags(Base):
 
 async def create_db_and_tables():
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -144,7 +152,8 @@ async def add_default_values():
         for model in models_to_add:
             existing_model = (
                 await session.execute(
-                    select(MLModel).where(MLModel.model_name == model.model_name)
+                    select(MLModel).where(
+                        MLModel.model_name == model.model_name)
                 )
             ).scalar()
 
@@ -205,7 +214,7 @@ async def get_user_db(session: AsyncSession = Depends(get_session)):
 # | cancellation_reason | String(512)             | None      | Nullable                    |
 # | created_at         | DateTime (timezone=True) | func.now() | Server Default              |
 # 
-# ### UsersToDocuments Table
+# ### UsersToUploadedFiles Table
 # | Column       | Type  | Default | Constraint            |
 # |--------------|-------|---------|-----------------------|
 # | id           | Integer | None  | Primary Key, Indexed, Autoincrement |
@@ -218,7 +227,7 @@ async def get_user_db(session: AsyncSession = Depends(get_session)):
 # | id     | Integer| None    | Primary Key, Indexed, Autoincrement |
 # | name   | String | None    | Not Null         |
 # 
-# ### DocumentsToTags Table
+# ### UploadedFilesToTags Table
 # | Column       | Type    | Default | Constraint                      |
 # |--------------|---------|---------|---------------------------------|
 # | id           | Integer | None    | Primary Key, Indexed, Autoincrement |
