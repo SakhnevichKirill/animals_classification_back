@@ -6,7 +6,7 @@ from sqlalchemy import select
 from api.db_model import TransactionHistory, get_session, TransactionStatusEnum, Document
 from sqlalchemy.exc import NoResultFound
 # from worker.models.text_classification_hackaton.utils import FileProcessor
-# from api.s3 import s3
+from api.s3 import s3
 import traceback
 
 # model = Model()

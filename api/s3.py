@@ -1,8 +1,10 @@
 import aioboto3
+from .env_config import config
 
-ENDPOINT_URL = 'http://0.0.0.0:9000'
-ACCESS_KEY = 'abc123'
-SECRET_KEY = 'someSecretKey'
+# ENDPOINT_URL = 'http://minio:9000'
+ENDPOINT_URL = f'http://{config.s3_address}:9000'
+ACCESS_KEY = 'KbrsOlr2qWaPS11VCKJm'
+SECRET_KEY = 'fhKVZfGjOemdE7djSNmfSVirFJaxlT00uNimeuC2'
 BUCKET_NAME = 'test-bucket'
 VERSION='s3v4'
 
@@ -40,4 +42,4 @@ class S3Client:
             # async with aiofiles.open('local_filename', 'wb') as file:
             #     await file.write(data)
             
-# s3 = S3Client()
+s3 = S3Client()

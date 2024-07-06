@@ -1,13 +1,11 @@
-# from api.s3 import s3
+from api.s3 import s3
 from PyPDF2 import PdfReader
 from docx import Document
 import openpyxl
 
 class FileProcessor:
     def __init__(self):
-        self.s3_client = ""
-        # self.s3_client = s3
-        # self.s3_client = s3
+        self.s3_client = s3
 
     async def process_file(self, filename: str, file_id: str):
         # Определение типа файла по расширению
@@ -16,7 +14,7 @@ class FileProcessor:
             raise Exception(f"Unexpected file type: {extension}")
 
         # Скачивание файла
-        # file_data = await self.s3_client.download_file(file_id)
+        file_data = await self.s3_client.download_file(file_id)
 
         # Обработка файла в зависимости от расширения
         if extension == 'pdf':

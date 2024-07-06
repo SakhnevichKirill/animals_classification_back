@@ -13,7 +13,7 @@ from fastapi_limiter.depends import RateLimiter
 from worker.data_models.elderly_people import DataModel
 from arq.jobs import Job
 import arq
-# from api.s3 import s3
+from api.s3 import s3
 
 router = APIRouter(
     dependencies=[Depends(RateLimiter(times=15, seconds=5))],
@@ -56,7 +56,7 @@ async def download_docs(
     document = result.scalars().first()
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    # data = await s3.download_file(filename)
+    data = await s3.download_file(filename)
     data = ""
     headers = {
         'Content-Disposition': f'attachment; filename="{document.name}"'
@@ -241,7 +241,7 @@ async def upload_document(
     user: User = await auth_manuspect_user(auth_token, session)
 
     doc_id = uuid.uuid4()
-    # await s3.upload_file(file=document.file, filename=str(doc_id))
+    await s3.upload_file(file=document.file, filename=str(doc_id))
 
     new_document = Document(id=doc_id, name=document.filename)
     session.add(new_document)

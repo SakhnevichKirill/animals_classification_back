@@ -26,12 +26,14 @@ from sqlalchemy.orm import relationship
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from fastapi_users import schemas
 import enum
-
+from .env_config import config
 
 Base = declarative_base()
 
 # Асинхронный URL для PostgreSQL
-DATABASE_URL = "postgresql+asyncpg://analyze_document:analyze_document@postgres/analyze_document"
+# postgresql+asyncpg://admin:admin@172.18.0.2/hack
+# DATABASE_URL = "postgresql+asyncpg://admin:admin@postgres/hack"
+DATABASE_URL = f'postgresql+asyncpg://admin:admin@{config.database_address}/hack'
 
 engine = create_async_engine(
     DATABASE_URL,

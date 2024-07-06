@@ -6,7 +6,8 @@ from fastapi_limiter import FastAPILimiter
 from api.Asyncrq import asyncrq
 from api.db_model import create_db_and_tables, add_default_values
 from api.endpoints import auth, predict, users, documents
-# from .s3 import s3, BUCKET_NAME
+from .s3 import s3, BUCKET_NAME
+from .env_config import config
 
 
 app = FastAPI(title="docs-class")
@@ -30,12 +31,19 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     global redis
-    redis = await aioredis.from_url(url="redis://redis")
+    # redis = await aioredis.from_url(url="redis://redis")
+    redis = await aioredis.from_url(url=f'redis://{config.redis_address}')
     await FastAPILimiter.init(redis)
     await create_db_and_tables()
     await add_default_values()
     await asyncrq.create_pool()
-    # await s3.create_bucket(BUCKET_NAME)
+    print(s3)
+    try:
+        await s3.create_bucket(BUCKET_NAME)
+    except Exception as e:
+        print(e)
+        # return json.dumps({"data": doc_id, "result": str(e)})
+
 
 
 @app.on_event("shutdown")

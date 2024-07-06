@@ -163,5 +163,6 @@ ssl
 postgres
 redis
 local-data
+minio-persistence
 .vscode
 frontend/build/05adc4ddcf7ebdfe8b74d00e724439ce/gen_dart_plugin_registrant.stamp
